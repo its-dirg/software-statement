@@ -146,6 +146,3 @@ def _create_sig_sws(sws_data, pem):
     key = [RSAKey().load_key(rsa_key)]
     alg = 'RS256'
     return sws.to_jwt(key=key, algorithm=alg)
-
-
-test_get_cert_key()
