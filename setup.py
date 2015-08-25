@@ -10,6 +10,7 @@ setup(
     license='',
     install_requires=[
         "oic",
+        "six",
     ],
     author='DIRG',
     author_email='',

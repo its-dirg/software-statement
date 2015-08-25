@@ -1,2 +1,3 @@
 pytest
+responses
 git+https://github.com/its-dirg/pyoidc@sws_py3

@@ -5,6 +5,7 @@ from jwkest.jws import alg2keytype
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 from oic.utils.keyio import build_keyjar
+import os
 from software_statement.message import SWSMessage
 
 __author__ = 'mathiashedstrom'
@@ -13,7 +14,7 @@ PORT = 8096
 HOST = "localhost"
 
 KEYS = [
-    {"type": "RSA", "key": "../example_src/software_API_publisher/sign_keys/private.key",
+    {"type": "RSA", "key": os.path.join(os.path.dirname(__file__), "sign_keys/private.key"),
      "use": ["enc", "sig"]},
 ]
 
@@ -31,6 +32,7 @@ def create_software_statement(sws_data):
 
 
 if __name__ == '__main__':
+    # TODO key as jwt
     HTTPD = HTTPServer((HOST, PORT), SimpleHTTPRequestHandler)
     HTTPD.socket = ssl.wrap_socket(HTTPD.socket, certfile='cp_keys/cert.pem', server_side=True,
                                    keyfile="cp_keys/key.pem")
