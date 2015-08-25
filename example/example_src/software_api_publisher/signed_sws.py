@@ -1,4 +1,5 @@
 # pylint: disable = missing-docstring
+import json
 import ssl
 
 from jwkest.jws import alg2keytype
@@ -10,17 +11,19 @@ from software_statement.message import SWSMessage
 
 __author__ = 'mathiashedstrom'
 
+PATH = os.path.dirname(__file__)
+
 PORT = 8096
 HOST = "localhost"
 
 KEYS = [
-    {"type": "RSA", "key": os.path.join(os.path.dirname(__file__), "sign_keys/private.key"),
+    {"type": "RSA", "key": os.path.join(PATH, "sign_keys/private.key"),
      "use": ["enc", "sig"]},
 ]
 
 
 def create_software_statement(sws_data):
-    sws_data["iss"] = "https://{host}:{port}/sign_keys/public.key".format(host=HOST, port=PORT)
+    sws_data["iss"] = "https://{host}:{port}/static/jwks.json".format(host=HOST, port=PORT)
     sws = SWSMessage()
     sws.from_dict(sws_data)
 
@@ -32,7 +35,15 @@ def create_software_statement(sws_data):
 
 
 if __name__ == '__main__':
-    # TODO key as jwt
+
+    if not os.path.exists("static"):
+        os.makedirs("static")
+    JWKS, _, _ = build_keyjar(KEYS)
+    JWKS_PATH = "static/jwks.json"
+    F = open(JWKS_PATH, "w")
+    F.write(json.dumps(JWKS))
+    F.close()
+
     HTTPD = HTTPServer((HOST, PORT), SimpleHTTPRequestHandler)
     HTTPD.socket = ssl.wrap_socket(HTTPD.socket, certfile='cp_keys/cert.pem', server_side=True,
                                    keyfile="cp_keys/key.pem")

@@ -1,5 +1,7 @@
 # pylint: disable=missing-docstring,import-error,protected-access,no-member
+import json
 import os
+from oic.utils.keyio import build_keyjar
 import pytest
 import responses
 from jwkest import BadSignature
@@ -56,16 +58,19 @@ def test_get_cert_key():
     iss = "https://localhost:{}/static/keys/key.pub".format(port)
     sws_data = {"iss": iss, "redirect_uris": ["https://example.com"]}
 
-    key_file = open(os.path.join(PATH, "keys/public.key"))
-    key = key_file.read()
-    key_file.close()
+    key = [
+        {"type": "RSA", "key": os.path.join(PATH, "keys/private.key"),
+         "use": ["enc", "sig"]},
+    ]
+    jwks, keyjar, _ = build_keyjar(key)
 
-    responses.add(responses.GET, iss, body=key, status=200, content_type='application/json')
+    responses.add(responses.GET, iss, body=json.dumps(jwks), status=200,
+                  content_type='application/json')
 
     trusted_domains = ["https://localhost:8565"]
     sws_m = SWSMessage(trusted_domains=trusted_domains, verify_signer_ssl=False, **sws_data)
     downloaded_key = sws_m._get_cert_key(iss)
-    assert downloaded_key == key
+    assert downloaded_key == keyjar.get_verify_key(owner="")
 
     with pytest.raises(SchemeError):
         sws_m._get_cert_key("http://example.com")
@@ -92,16 +97,19 @@ def test_valid_signature():
     signing_pem = sig_pem_file.read()
     sig_pem_file.close()
 
-    ver_pem_file = open(os.path.join(PATH, "keys/public.key"))
-    ver_pem = ver_pem_file.read()
-    ver_pem_file.close()
+    key = [
+        {"type": "RSA", "key": os.path.join(PATH, "keys/private.key"),
+         "use": ["enc", "sig"]},
+    ]
+    jwks, _, _ = build_keyjar(key)
 
     iss = "https://test.com"
     trusted_domains = [iss]
     sws_data = {"iss": iss, "redirect_uris": ["https://example.com"]}
     signed_sws_jwt = _create_sig_sws(sws_data, signing_pem)
 
-    responses.add(responses.GET, iss, body=ver_pem, status=200, content_type='application/json')
+    responses.add(responses.GET, iss, body=json.dumps(jwks), status=200,
+                  content_type='application/json')
 
     sws_m = SWSMessage(trusted_domains=trusted_domains)
     sws_m.from_jwt(signed_sws_jwt)
@@ -113,16 +121,19 @@ def test_invalid_signature():
     signing_pem = sig_pem_file.read()
     sig_pem_file.close()
 
-    ver_pem_file = open(os.path.join(PATH, "keys/public.key"))
-    ver_pem = ver_pem_file.read()
-    ver_pem_file.close()
+    key = [
+        {"type": "RSA", "key": os.path.join(PATH, "keys/private.key"),
+         "use": ["enc", "sig"]},
+    ]
+    jwks, _, _ = build_keyjar(key)
 
     iss = "https://example.com"
     trusted_domains = [iss]
     sws_data = {"iss": iss, "redirect_uris": ["https://localhost"]}
     signed_sws_jwt = _create_sig_sws(sws_data, signing_pem)
 
-    responses.add(responses.GET, iss, body=ver_pem, status=200, content_type='application/json')
+    responses.add(responses.GET, iss, body=json.dumps(jwks), status=200,
+                  content_type='application/json')
 
     sws_m = SWSMessage(trusted_domains=trusted_domains)
     with pytest.raises(BadSignature):
@@ -135,3 +146,6 @@ def _create_sig_sws(sws_data, pem):
     key = [RSAKey().load_key(rsa_key)]
     alg = 'RS256'
     return sws.to_jwt(key=key, algorithm=alg)
+
+
+test_get_cert_key()

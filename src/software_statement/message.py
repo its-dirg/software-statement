@@ -1,3 +1,5 @@
+import json
+from oic.utils.keyio import build_keyjar, KeyBundle, KeyJar
 import requests
 from requests.exceptions import ConnectionError
 from oic.oauth2.message import SINGLE_REQUIRED_STRING
@@ -38,10 +40,11 @@ class SWSMessage(RegistrationRequest):
             txt = self.sws_jwt
         _jw = jws.factory(txt)
         if _jw:
-            pem = self._get_cert_key(self._dict["iss"])
-            rsa_key = import_rsa_key(pem)
-            key = [RSAKey().load_key(rsa_key)]
-            _jw.verify_compact(txt, key)
+            # pem = self._get_cert_key(self._dict["iss"])
+            # rsa_key = import_rsa_key(pem)
+            # key = [RSAKey().load_key(rsa_key)]
+            # _jw.verify_compact(txt, key)
+            _jw.verify_compact(txt, self._get_cert_key(self._dict["iss"]))
 
     def _get_cert_key(self, issuer):
         split_iss = urlsplit(issuer)
@@ -56,7 +59,11 @@ class SWSMessage(RegistrationRequest):
             res = requests.get(issuer, verify=self.verify_signer_ssl)
         except ConnectionError as con_exc:
             raise ConnectionError("Could not connect to sws signer server: {}".format(str(con_exc)))
-        return res.text
+
+        kb = KeyBundle(keys=json.loads(res.text)["keys"])
+        kj = KeyJar()
+        kj.issuer_keys[issuer] = [kb]
+        return kj.get_verify_key(owner=issuer)
 
     def _assert_valid_domain(self, iss):
         for domain in self.trusted_domains:

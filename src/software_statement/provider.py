@@ -13,10 +13,6 @@ from software_statement.message import SWSMessage
 __author__ = 'mathiashedstrom'
 
 
-class UntrustedDomainException(Exception):
-    pass
-
-
 class SWSProvider(Provider):
     def __init__(self, name, sdb, cdb, authn_broker, userinfo, authz,
                  client_authn, symkey, trusted_domains, verify_signer_ssl=True, **kwarg):
@@ -30,7 +26,6 @@ class SWSProvider(Provider):
         unpacked_request = self.unpack_request(request, RegistrationRequest)
 
         ignore = ["iss"]
-
         try:
             software_statement = self.retrieve_software_statement(
                 unpacked_request["software_statement"])
