@@ -173,27 +173,6 @@ def test_invalid_signature():
         sws_m.from_jwt(signed_sws_jwt)
 
 
-@responses.activate
-def test_missing_signature():
-    key = [
-        {"type": "RSA", "key": os.path.join(PATH, "keys/private.key"),
-         "use": ["enc", "sig"]},
-    ]
-    jwks, _, _ = build_keyjar(key)
-
-    iss = "https://example.com"
-    trusted_domains = [iss]
-    sws_data = {"iss": iss, "redirect_uris": ["https://localhost"]}
-    sws_jwt = SWSMessage(**sws_data).to_jwt()
-
-    responses.add(responses.GET, iss, body=json.dumps(jwks), status=200,
-                  content_type='application/json')
-
-    sws_m = SWSMessage(trusted_domains=trusted_domains)
-    with pytest.raises(BadSignature):
-        sws_m.from_jwt(sws_jwt)
-
-
 def _create_sig_sws(sws_data, pem):
     sws = SWSMessage(**sws_data)
     rsa_key = import_rsa_key(pem)

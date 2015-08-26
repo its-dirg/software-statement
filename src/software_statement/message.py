@@ -46,7 +46,6 @@ class SWSMessage(RegistrationRequest):
             raise BadSignature("SWS message not signed")
         _jw.verify_compact(txt, self._get_cert_key(self._dict["iss"]))
 
-
     def _get_cert_key(self, issuer):
         split_iss = urlsplit(issuer)
         try:
@@ -59,7 +58,8 @@ class SWSMessage(RegistrationRequest):
         try:
             res = requests.get(issuer, verify=self.verify_signer_ssl)
         except ConnectionError as con_exc:
-            raise ConnectionError("Could not connect to sws signer server: {}".format(str(con_exc)))
+            raise ConnectionError(
+                "Could not connect to sws signer server: {}".format(str(con_exc)))
         try:
             kb = KeyBundle(keys=json.loads(res.text)["keys"])
             kj = KeyJar()
