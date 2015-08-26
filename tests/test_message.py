@@ -12,6 +12,7 @@ from oic.oauth2.message import MissingRequiredAttribute
 from software_statement.message import SWSMessage
 from software_statement.message import UntrustedDomainException
 from six.moves.urllib.parse import urlsplit
+from requests.exceptions import ConnectionError
 
 __author__ = 'mathiashedstrom'
 
@@ -81,6 +82,38 @@ def test_get_cert_key():
         sws_m._get_cert_key(iss)
 
 
+@responses.activate
+@pytest.mark.parametrize("key_body", [
+    ("UNKNOWN FORMAT"),
+    (json.dumps({"UNKNOWN": "FORMAT"})),
+    (json.dumps({"keys": [{"UNKNOWN": "FORMAT"}]})),
+])
+def test_cert_key_unknown_format(key_body):
+    iss = "https://localhost:8000"
+    sws_data = {"iss": iss, "redirect_uris": ["https://example.com"]}
+
+    responses.add(responses.GET, iss, body=key_body, status=200,
+                  content_type='application/json')
+
+    trusted_domains = [iss]
+    sws_m = SWSMessage(trusted_domains=trusted_domains, verify_signer_ssl=False, **sws_data)
+    with pytest.raises(ValueError):
+        sws_m._get_cert_key(iss)
+
+
+@responses.activate
+def test_cert_key_connection_error():
+    iss = "https://localhost:8000"
+    sws_data = {"iss": iss, "redirect_uris": ["https://example.com"]}
+
+    responses.add(responses.GET, iss, body=ConnectionError("Connection error"))
+
+    trusted_domains = [iss]
+    sws_m = SWSMessage(trusted_domains=trusted_domains, verify_signer_ssl=False, **sws_data)
+    with pytest.raises(ConnectionError):
+        sws_m._get_cert_key(iss)
+
+
 @pytest.mark.parametrize("sws_data", [
     ({"iss": "https:/iss.com"}),
     ({"redirect_uris": ["https://example.com"]}),
@@ -88,7 +121,7 @@ def test_get_cert_key():
 def test_missing_required_attr(sws_data):
     sws_m = SWSMessage(**sws_data)
     with pytest.raises(MissingRequiredAttribute):
-        sws_m.verify()
+        sws_m.verify(verify_signature=False)
 
 
 @responses.activate
@@ -138,6 +171,27 @@ def test_invalid_signature():
     sws_m = SWSMessage(trusted_domains=trusted_domains)
     with pytest.raises(BadSignature):
         sws_m.from_jwt(signed_sws_jwt)
+
+
+@responses.activate
+def test_missing_signature():
+    key = [
+        {"type": "RSA", "key": os.path.join(PATH, "keys/private.key"),
+         "use": ["enc", "sig"]},
+    ]
+    jwks, _, _ = build_keyjar(key)
+
+    iss = "https://example.com"
+    trusted_domains = [iss]
+    sws_data = {"iss": iss, "redirect_uris": ["https://localhost"]}
+    sws_jwt = SWSMessage(**sws_data).to_jwt()
+
+    responses.add(responses.GET, iss, body=json.dumps(jwks), status=200,
+                  content_type='application/json')
+
+    sws_m = SWSMessage(trusted_domains=trusted_domains)
+    with pytest.raises(BadSignature):
+        sws_m.from_jwt(sws_jwt)
 
 
 def _create_sig_sws(sws_data, pem):
