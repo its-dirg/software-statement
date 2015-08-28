@@ -1,3 +1,4 @@
+# pylint: disable=missing-docstring
 import hashlib
 
 from six import iteritems
@@ -12,6 +13,7 @@ from software_statement.message import SWSMessage
 
 __author__ = 'mathiashedstrom'
 
+SWS_CACHE_KEY = "software_statement_cache"
 
 class SWSProvider(Provider):
     def __init__(self, name, sdb, cdb, authn_broker, userinfo, authz,
@@ -27,7 +29,7 @@ class SWSProvider(Provider):
 
         ignore = ["iss"]
         try:
-            software_statement = self.retrieve_software_statement(
+            software_statement = self.parse_software_statement_as_jwt(
                 unpacked_request["software_statement"])
         except KeyError:
             raise MissingRequiredAttribute("Request did not contain a software statement")
@@ -37,7 +39,7 @@ class SWSProvider(Provider):
                 unpacked_request[key] = value
 
         # Update cache
-        unpacked_request["software_statement_cache"] = self._get_sws_id(
+        unpacked_request[SWS_CACHE_KEY] = self._get_sws_id(
             unpacked_request["software_statement"])
 
         return super(SWSProvider, self).registration_endpoint(unpacked_request, authn=authn,
@@ -46,26 +48,32 @@ class SWSProvider(Provider):
     def _get_sws_id(self, txt):
         return hashlib.md5(txt.encode("utf-8")).hexdigest()
 
+    def _retrieve_software_statement(self, unpacked_request):
+        try:
+            sws_message = self.parse_software_statement_as_jwt(unpacked_request["client_id"],
+                                                               verify=False)
+            sws_jwts = unpacked_request["client_id"]
+        except Exception:
+            sws_message = self.parse_software_statement_as_jwt(
+                unpacked_request["software_statement"], verify=False)
+            sws_jwts = unpacked_request["software_statement"]
+        return sws_message, sws_jwts
+
     def authorization_endpoint(self, request="", cookie=None, **kwargs):
         unpacked_request = self.unpack_request(request, AuthorizationRequest)
 
-        try:
-            software_statement = self.retrieve_software_statement(unpacked_request["client_id"],
-                                                                  verify=False)
-        except Exception:
-            software_statement = self.retrieve_software_statement(
-                unpacked_request["software_statement"], verify=False)
+        sws_message, sws_jwts = self._retrieve_software_statement(unpacked_request)
 
         ignore = ["iss"]
-        for key, value in iteritems(software_statement.to_dict()):
+        for key, value in iteritems(sws_message.to_dict()):
             if key not in ignore:
                 unpacked_request[key] = value
 
         # Check the received sws against the cache.
         if not self.is_in_cache(unpacked_request):
-            software_statement.verify()
-            sws_id = self._get_sws_id(unpacked_request["software_statement"])
-            resp = self.update_registered_data(sws_id, software_statement, unpacked_request)
+            sws_message.verify()
+            sws_id = self._get_sws_id(sws_jwts)
+            resp = self.update_registered_data(sws_id, sws_message, unpacked_request)
             if resp:
                 return resp
 
@@ -74,7 +82,7 @@ class SWSProvider(Provider):
         return super(SWSProvider, self).authorization_endpoint(request=request, cookie=cookie,
                                                                **kwargs)
 
-    def update_registered_data(self, sws_id, software_statement, unpacked_request):
+    def update_registered_data(self, sws_id, sws_message, unpacked_request):
         client_id = unpacked_request["client_id"]
 
         if client_id not in self.cdb:
@@ -96,14 +104,20 @@ class SWSProvider(Provider):
 
             self.cdb[_rat] = client_id
 
-        _cinfo = self.do_client_registration(software_statement.to_dict(), client_id,
+        #TODO Why should this be ignored "redirect_uris", "policy_uri", "logo_uri", "tos_uri",?
+        _cinfo = self.do_client_registration(sws_message.to_dict(),
+                                             client_id,
                                              ignore=["redirect_uris",
-                                                     "policy_uri", "logo_uri",
-                                                     "tos_uri", "client_id",
-                                                     "client_secret", "registration_access_token",
+                                                     "policy_uri",
+                                                     "logo_uri",
+                                                     "tos_uri",
+                                                     "client_id",
+                                                     "client_secret",
+                                                     "registration_access_token",
                                                      "registration_client_uri",
                                                      "client_secret_expires_at",
-                                                     "client_id_issued_at", "software_statement"])
+                                                     "client_id_issued_at",
+                                                     "software_statement"])
         if isinstance(_cinfo, Response):
             return _cinfo
 
@@ -116,7 +130,7 @@ class SWSProvider(Provider):
             cinfo[key] = value
 
         # Update cache
-        cinfo["software_statement_cache"] = sws_id
+        cinfo[SWS_CACHE_KEY] = sws_id
 
         self.cdb[client_id] = cinfo
         try:
@@ -134,15 +148,18 @@ class SWSProvider(Provider):
 
     def is_in_cache(self, unpacked_request):
         # Check cache if the software statement need to be verified
+        (_, software_statement_jwts) = self._retrieve_software_statement(unpacked_request)
+
         try:
             client_id = unpacked_request["client_id"]
-            return self.cdb[client_id]["software_statement_cache"] == self._get_sws_id(
-                unpacked_request["software_statement"])
+            return self.cdb[client_id][SWS_CACHE_KEY] == self._get_sws_id(software_statement_jwts)
         except KeyError:
             return False
 
-    def retrieve_software_statement(self, text, verify=True):
+
+
+    def parse_software_statement_as_jwt(self, jwts, verify=True):
         sws_m = SWSMessage(trusted_domains=self.trusted_domains,
                            verify_signer_ssl=self.verify_signer_ssl)
-        sws_m.from_jwt(text, verify=verify)
+        sws_m.from_jwt(jwts, verify=verify)
         return sws_m

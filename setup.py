@@ -11,6 +11,7 @@ setup(
     install_requires=[
         "oic",
         "six",
+        "cherrypy"
     ],
     author='DIRG',
     author_email='',

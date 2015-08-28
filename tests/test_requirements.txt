@@ -1,3 +1,5 @@
 pytest
 responses
+mock
+coverage
 git+https://github.com/its-dirg/pyoidc@sws_py3

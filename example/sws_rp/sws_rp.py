@@ -13,7 +13,8 @@ from oic.utils.http_util import NotFound
 from oic.utils.http_util import Response
 from oic.utils.http_util import Redirect
 from oic.utils.keyio import build_keyjar
-from software_api_publisher.signed_sws import create_software_statement
+from example.example_src.software_api_publisher.signed_sws import create_software_statement
+
 
 LOGGER = logging.getLogger("")
 LOGFILE_NAME = 'rp.log'
