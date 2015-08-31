@@ -2,14 +2,14 @@
 import json
 import os
 import six
+import pytest
+import responses
 from time import time
 
 from jwkest import BadSignature
 from jwkest.jwk import import_rsa_key, RSAKey
-import responses
 from mock.mock import patch
 from oic.oauth2.message import MissingRequiredAttribute
-import pytest
 from oic.oauth2 import rndstr
 from oic.utils.authn.authn_context import AuthnBroker
 from oic.utils.authn.client import verify_client
@@ -221,8 +221,8 @@ class TestProvider:
 
     @responses.activate
     @patch("oic.oic.provider.Provider.registration_endpoint")
-    def test_unpack_software_statement_and_overwrite_registration_request_info(self,
-                                                                               super_registration_endpoint_mock):
+    def test_unpack_sws_and_overwrite_registration_request_info(self,
+                                                                super_registration_endpoint_mock):
         self.set_software_api_publisher_response()
         software_statement, sws_content = generate_signed_sws()
         url_to_overwrite = "https://localhost"

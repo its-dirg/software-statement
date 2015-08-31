@@ -25,7 +25,7 @@ Software API publisher
 ----------------------
 
 The software API publisher is the one that can sign a software_statement. The publisher will add an **"iss"** attribute
-to the software_statement, that holds a link to the public part of the signing key used to sing the software_statement.
+to the software_statement, holding a link to the public part of the signing key used to sing the software_statement.
 This public key must be hosted from a SSL server with a certificate signed by a trusted certificate authority.
 
 
