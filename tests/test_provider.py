@@ -1,6 +1,7 @@
 # pylint: disable=missing-docstring,import-error
 import json
 import os
+import six
 from time import time
 
 from jwkest import BadSignature
@@ -21,7 +22,6 @@ from oic.utils.sdb import SessionDB
 from software_statement.message import SWSMessage
 from six.moves.urllib.parse import urlparse, parse_qs
 from software_statement.provider import SWSProvider, SWS_CACHE_KEY
-
 
 OP_ISSUER = "https://connect-op.heroku.com"
 
@@ -50,6 +50,7 @@ class DummyAuthn(UserAuthnMethod):
             return None, 0
         else:
             return {"uid": self.user}, time()
+
 
 # AUTHN = UsernamePasswordMako(None, "login.mako", tl, PASSWD, "authenticated")
 AUTHN_BROKER = AuthnBroker()
@@ -80,7 +81,7 @@ def read_key_from_file(key_file_name):
 
 def create_unpacked_reg_request_dict(client_id, request):
     reg_request_dict = request
-    if isinstance(request, basestring):
+    if isinstance(request, six.string_types):
         reg_request_dict = json.loads(request)
 
     reg_request_dict['client_id'] = client_id
